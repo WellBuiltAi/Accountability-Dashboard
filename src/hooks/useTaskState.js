@@ -1,11 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { phases, backgroundTasks } from '../data/tasks'
-import { saveDashboardState, subscribeToDashboard } from '../services/firestore'
-import { isFirebaseEnabled } from '../firebase'
 
 const STORAGE_KEY = 'wellbuilt-tasks'
 const BG_STORAGE_KEY = 'wellbuilt-bg-tasks'
 const DAILY_LOG_KEY = 'wellbuilt-daily-log'
+const API_URL = '/api/state'
 
 function getInitialTaskState() {
   const saved = localStorage.getItem(STORAGE_KEY)
@@ -56,15 +55,62 @@ function getInitialDailyLog() {
   return {}
 }
 
+async function saveToBackend(taskState, bgState, dailyLog) {
+  try {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskState, bgState, dailyLog }),
+    })
+  } catch (err) {
+    console.warn('[Backend] Save failed:', err.message)
+  }
+}
+
+async function loadFromBackend() {
+  try {
+    const res = await fetch(API_URL)
+    if (res.ok) return await res.json()
+  } catch (err) {
+    console.warn('[Backend] Load failed:', err.message)
+  }
+  return null
+}
+
 export function useTaskState() {
   const [taskState, setTaskState] = useState(getInitialTaskState)
   const [bgState, setBgState] = useState(getInitialBgState)
   const [dailyLog, setDailyLog] = useState(getInitialDailyLog)
 
-  // Track whether updates are from Firestore (to avoid echo saves)
-  const isRemoteUpdate = useRef(false)
-  // Debounce timer for Firestore saves
   const saveTimer = useRef(null)
+  const isHydrating = useRef(false)
+
+  // On mount: pull from backend and merge (backend wins for conflicts)
+  useEffect(() => {
+    loadFromBackend().then(remote => {
+      if (!remote) return
+      isHydrating.current = true
+
+      setTaskState(prev => {
+        const merged = { ...prev, ...remote.taskState }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
+        return merged
+      })
+      setBgState(prev => {
+        const merged = { ...prev, ...remote.bgState }
+        localStorage.setItem(BG_STORAGE_KEY, JSON.stringify(merged))
+        return merged
+      })
+      setDailyLog(prev => {
+        const merged = { ...prev, ...remote.dailyLog }
+        localStorage.setItem(DAILY_LOG_KEY, JSON.stringify(merged))
+        return merged
+      })
+
+      // Give state time to settle before enabling saves
+      setTimeout(() => { isHydrating.current = false }, 300)
+    })
+  }, [])
 
   // Persist to localStorage on every change
   useEffect(() => {
@@ -79,50 +125,19 @@ export function useTaskState() {
     localStorage.setItem(DAILY_LOG_KEY, JSON.stringify(dailyLog))
   }, [dailyLog])
 
-  // Debounced save to Firestore (500ms after last change)
+  // Debounced save to backend (800ms after last change)
   useEffect(() => {
-    if (!isFirebaseEnabled()) return
-    if (isRemoteUpdate.current) {
-      isRemoteUpdate.current = false
-      return
-    }
+    if (isHydrating.current) return
 
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      saveDashboardState(taskState, bgState, dailyLog)
-    }, 500)
+      saveToBackend(taskState, bgState, dailyLog)
+    }, 800)
 
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current)
     }
   }, [taskState, bgState, dailyLog])
-
-  // Subscribe to Firestore real-time updates (cross-device sync)
-  useEffect(() => {
-    if (!isFirebaseEnabled()) return
-
-    const unsubscribe = subscribeToDashboard((remote) => {
-      if (!remote) return
-
-      // Only update if remote data is different from local
-      isRemoteUpdate.current = true
-
-      setTaskState(prev => {
-        const merged = { ...prev, ...remote.taskState }
-        return JSON.stringify(merged) !== JSON.stringify(prev) ? merged : prev
-      })
-      setBgState(prev => {
-        const merged = { ...prev, ...remote.bgState }
-        return JSON.stringify(merged) !== JSON.stringify(prev) ? merged : prev
-      })
-      setDailyLog(prev => {
-        const merged = { ...prev, ...remote.dailyLog }
-        return JSON.stringify(merged) !== JSON.stringify(prev) ? merged : prev
-      })
-    })
-
-    return unsubscribe
-  }, [])
 
   const toggleTask = useCallback((taskId) => {
     setTaskState(prev => ({

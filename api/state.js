@@ -1,14 +1,6 @@
-import { Redis } from '@upstash/redis'
-
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
-})
-
-const STATE_KEY = 'wellbuilt:dashboard-state'
+const BLOB_URL = 'https://jsonblob.com/api/jsonBlob/019cd282-10f4-705a-8682-34afd0012673'
 
 export default async function handler(req, res) {
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
@@ -19,8 +11,14 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const data = await redis.get(STATE_KEY)
-      return res.status(200).json(data || { taskState: {}, bgState: {}, dailyLog: {} })
+      const response = await fetch(BLOB_URL, {
+        headers: { 'Accept': 'application/json' },
+      })
+      if (!response.ok) {
+        return res.status(200).json({ taskState: {}, bgState: {}, dailyLog: {} })
+      }
+      const data = await response.json()
+      return res.status(200).json(data)
     }
 
     if (req.method === 'POST') {
@@ -31,13 +29,17 @@ export default async function handler(req, res) {
         dailyLog: dailyLog || {},
         updatedAt: new Date().toISOString(),
       }
-      await redis.set(STATE_KEY, payload)
+      await fetch(BLOB_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
       return res.status(200).json({ ok: true })
     }
 
     return res.status(405).json({ error: 'Method not allowed' })
   } catch (err) {
-    console.error('[KV Error]', err.message)
+    console.error('[Storage Error]', err.message)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }

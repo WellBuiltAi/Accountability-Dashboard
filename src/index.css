@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@theme {
+  --color-gold: #B2851B;
+  --color-gold-light: #D4A832;
+  --color-gold-dim: #8A6815;
+  --color-olive: #4A360D;
+  --color-dark: #000000;
+  --color-dark-card: #0A0A0A;
+  --color-dark-border: #1A1A1A;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #999999;
+  --color-text-muted: #555555;
+  --font-heading: "Bebas Neue", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  background: #000000;
+  color: #FFFFFF;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+/* Gold glow utility */
+.gold-glow {
+  box-shadow: 0 0 20px rgba(178, 133, 27, 0.3), 0 0 40px rgba(178, 133, 27, 0.1);
+}
+
+.gold-glow-strong {
+  box-shadow: 0 0 30px rgba(178, 133, 27, 0.5), 0 0 60px rgba(178, 133, 27, 0.2);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0A0A0A;
+}
+::-webkit-scrollbar-thumb {
+  background: #4A360D;
+  border-radius: 3px;
+}
+
+/* Checkbox styling */
+input[type="checkbox"] {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #4A360D;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+input[type="checkbox"]:hover {
+  border-color: #B2851B;
+}
+
+input[type="checkbox"]:checked {
+  background: #B2851B;
+  border-color: #B2851B;
+}
+
+input[type="checkbox"]:checked::after {
+  content: "✓";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #000;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+input[type="checkbox"]:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
